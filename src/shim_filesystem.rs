@@ -2,13 +2,12 @@
 //! This is used to paste over normal reading of the Rules files and building them into the code for web assembly (WASM) which
 //! can't do file system access. For the latter, the Rules directory is zipped up.
 
-use std::path::{Path, PathBuf};
 use crate::errors::*;
 use cfg_if::cfg_if;
+use std::path::{Path, PathBuf};
 
 #[allow(unused_imports)]
-use log::{debug};
-
+use log::debug;
 
 // The zipped files are needed by WASM builds.
 // However, they are also useful for other builds because there really isn't another good way to get at the rules.
@@ -45,7 +44,7 @@ cfg_if! {
         fn canonicalize_path_separators(path: &Path) -> String {
             return path.to_str().unwrap_or_default().replace("\\", "/");
         }
-        
+
         /// Return a zip archive given the zip bytes
         fn get_zip_archive(zip_bytes: &[u8]) -> Result<ZipArchive<Cursor<&[u8]>>> {
             let buf_reader = Cursor::new(zip_bytes);
@@ -108,7 +107,7 @@ cfg_if! {
                         let path = match file.enclosed_name() {
                             Some(path) => PathBuf::from(containing_dir).join(path),
                             None => {
-                                bail!("Entry {} has a suspicious path (outside of archive)", file.name());
+                                bail!("Entry {} has a suspicious path (outside of archive)", file.name().unwrap());
                             }
                         };
                         // debug!("read_zip_file: file path='{}'", path.display());
@@ -146,7 +145,7 @@ cfg_if! {
             }
             return FILES.with(|files| files.borrow().contains_key(&canonicalize_path_separators(path)) );
         }
-        
+
         pub fn is_dir_shim(path: &Path) -> bool {
             if FILES.with(|files| files.borrow().is_empty()) {
                 let _ignore_result = initialize_static_vars();
@@ -176,7 +175,7 @@ cfg_if! {
                 return answer;
             });
         }
-        
+
 
         pub fn find_all_dirs_shim(dir: &Path, found_dirs: &mut Vec<PathBuf> ) {
             return DIRECTORIES.with(|dirs| {
@@ -191,7 +190,7 @@ cfg_if! {
             });
         }
 
-        
+
         pub fn canonicalize_shim(path: &Path) -> std::io::Result<PathBuf> {
             use std::ffi::OsStr;
             let dot_dot = OsStr::new("..");
@@ -205,7 +204,7 @@ cfg_if! {
             }
             return Ok(result);
         }
-        
+
         /// Read the file at 'path' and return its contents as a String
         pub fn read_to_string_shim(path: &Path) -> Result<String> {
             let path = canonicalize_shim(path).unwrap();        // can't fail
@@ -333,14 +332,14 @@ cfg_if! {
             }
             return path.is_file();
         }
-        
+
         pub fn is_dir_shim(path: &Path) -> bool {
             if IN_MEMORY_DIRS.read().unwrap().as_ref().is_some_and(|d| d.contains(&get_in_memory_key(path))) {
                 return true;
             }
             return path.is_dir();
         }
-        
+
         pub fn find_files_in_dir_that_ends_with_shim(dir: &Path, ending: &str) ->  Vec<String> {
             let dir_name = get_in_memory_key(dir);
             let mut answer = Vec::new();
@@ -405,7 +404,7 @@ cfg_if! {
                 }
             }
         }
-        
+
         // Tests extract language/braille zips in parallel. During extraction, individual YAML
         // files can briefly exist in a partially-written state (created/truncated before the
         // full contents are flushed). Guard both extraction and YAML reads with the same lock

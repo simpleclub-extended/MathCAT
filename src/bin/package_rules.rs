@@ -37,12 +37,7 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
 
-    return match package_rules(
-        &cli.source,
-        &cli.output,
-        cli.minimize,
-        downloadable_compression(),
-    ) {
+    return match package_rules(&cli.source, &cli.output, cli.minimize, downloadable_compression()) {
         Ok(minimized) => {
             let label = if cli.minimize { "minimized" } else { "standard" };
             println!("Created {label} archive: {}", cli.output.display());
@@ -55,7 +50,7 @@ fn main() -> ExitCode {
             eprintln!("error: {e}");
             ExitCode::from(1)
         }
-    }
+    };
 }
 
 #[cfg(test)]
@@ -76,18 +71,21 @@ mod tests {
             .unwrap();
         let mut inner = ZipArchive::new(Cursor::new(inner_bytes)).unwrap();
         let mut text = String::new();
-        inner
-            .by_name(inner_path)
-            .unwrap()
-            .read_to_string(&mut text)
-            .unwrap();
+        inner.by_name(inner_path).unwrap().read_to_string(&mut text).unwrap();
         return text;
     }
 
     fn outer_names(bytes: &[u8]) -> Vec<String> {
         let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
         let mut names: Vec<String> = (0..archive.len())
-            .map(|i| archive.by_index(i).unwrap().name().replace('\\', "/"))
+            .map(|i| {
+                archive
+                    .by_index(i)
+                    .unwrap()
+                    .name()
+                    .map(|s| s.replace('\\', "/"))
+                    .unwrap()
+            })
             .collect();
         names.sort();
         return names;
@@ -216,8 +214,7 @@ mod tests {
                 continue;
             }
             let source = fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-            let minimized = minimize_yaml_text(&source)
-                .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            let minimized = minimize_yaml_text(&source).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
             assert!(
                 !minimized.lines().any(|line| line.trim_start().starts_with("- ")),
                 "{} still uses block sequences",
